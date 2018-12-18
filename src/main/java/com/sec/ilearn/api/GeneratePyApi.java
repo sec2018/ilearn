@@ -153,4 +153,17 @@ public class GeneratePyApi {
         }
         return ResponseEntity.ok(r);
     }
+
+
+    @ApiOperation(value = "综合测试", notes = "综合测试")
+    @ApiImplicitParams({
+            @ApiImplicitParam(name = "filename", value = "保存的文件名", required = true, dataType = "String",paramType = "query"),
+            @ApiImplicitParam(name = "path", value = "要复制的文件,以逗号隔开", required = true, dataType = "String",paramType = "query")
+    })
+    @RequestMapping(value = "runall",method = RequestMethod.GET)
+    @ResponseBody
+    public ResponseEntity<JsonResult> testShell(@RequestParam(value = "filename")String filename,@RequestParam(value = "path")String path){
+        JsonResult r = new JsonResult();
+        return ResponseEntity.ok(r);
+    }
 }
