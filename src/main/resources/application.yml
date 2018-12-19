@@ -1,4 +1,7 @@
 # Tomcat
+doc:
+  path: D:\GitHubDoc\gitdoc\ilearn\doc\
+
 server:
     tomcat:
         uri-encoding: UTF-8
