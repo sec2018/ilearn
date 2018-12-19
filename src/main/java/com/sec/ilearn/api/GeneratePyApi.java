@@ -11,6 +11,7 @@ import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.util.ResourceUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -122,13 +123,14 @@ public class GeneratePyApi {
 
     @ApiOperation(value = "执行shell命令", notes = "执行shell命令")
     @ApiImplicitParams({
-            @ApiImplicitParam(name = "param", value = "相关参数", required = true, dataType = "String",paramType = "query")
+            @ApiImplicitParam(name = "pyfilename", value = "相关参数", required = true, dataType = "String",paramType = "query")
     })
     @RequestMapping(value = "runshell",method = RequestMethod.GET)
     @ResponseBody
-    public ResponseEntity<JsonResult> testShell(@RequestParam(value = "param")String param){
+    public ResponseEntity<JsonResult> testShell(@RequestParam(value = "pyfilename")String pyfilename){
         JsonResult r = new JsonResult();
-        String[] cmds = {"/bin/sh","-c","ps -ef|grep java"};
+//        String[] cmds = {"/bin/sh","-c","ps -ef|grep java"};
+        String[] cmds = {"/bin/sh","-c","python "+pyfilename};
         String result = "";
         Process pro = null;
         try {
@@ -141,7 +143,7 @@ public class GeneratePyApi {
                 result += line;
             }
             r.setCode("200");
-            r.setMsg("执行shell命令成功！");
+            r.setMsg("python "+pyfilename+"执行shell命令成功！");
             r.setData(result);
             r.setSuccess(true);
             logger.info(new Date().toLocaleString()+"执行shell命令成功");
@@ -171,7 +173,7 @@ public class GeneratePyApi {
         for (String pa : paths){
             result += readFileByLines(pa);
         }
-        TextToFile(filename,result);
+        TextToFile(filename,result,"win");
         ResponseEntity<JsonResult> res = testRunPy("doc/"+filename);
         res.getBody().setMsg("生成文件路径为："+ docInfo.getPath() +filename);
         return res;
@@ -218,13 +220,21 @@ public class GeneratePyApi {
      * @param strFilename
      * @param strBuffer
      */
-    public static void TextToFile(String strFilename, String strBuffer)
+    public static void TextToFile(String strFilename, String strBuffer, String flag)
     {
         File fileText = null;
         try
         {
             // 创建文件对象
-            fileText = new File("doc/"+strFilename);
+            if(flag.equals("win")){
+                fileText = new File("doc/"+strFilename);
+            }else{
+                fileText = new File(getJarRootPath()+"/doc/"+strFilename);
+                File file=new File(getJarRootPath()+"/doc");
+                if(!file.exists()){//如果文件夹不存在
+                    file.mkdir();//创建文件夹
+                }
+            }
             // 向文件写入对象写入信息
             FileWriter fileWriter = new FileWriter(fileText);
             // 写文件
@@ -256,13 +266,13 @@ public class GeneratePyApi {
     }
 
 
-    @ApiOperation(value = "解析json生成新文件并运行", notes = "综合测试")
+    @ApiOperation(value = "解析json生成新文件并保存win运行", notes = "综合测试")
     @ApiImplicitParams({
             @ApiImplicitParam(name = "json", value = "传递来的json字符串", required = true, dataType = "String",paramType = "query")
     })
-    @RequestMapping(value = "runjson",method = RequestMethod.GET)
+    @RequestMapping(value = "runwinjson",method = RequestMethod.GET)
     @ResponseBody
-    public ResponseEntity<JsonResult> testCombine(@RequestParam(value = "json")String json){
+    public ResponseEntity<JsonResult> testWinCombine(@RequestParam(value = "json")String json){
 
         JSONObject jsonObject = JSONObject.parseObject(json);
         String filename = jsonObject.getString("filename");
@@ -271,9 +281,50 @@ public class GeneratePyApi {
         for (String pa : paths){
             result += readFileByLines(pa);
         }
-        TextToFile(filename,result);
-        ResponseEntity<JsonResult> res = testRunPy("doc/"+filename);
+        TextToFile(filename,result,"win");
+        ResponseEntity<JsonResult> res = testRunPy("doc/"+filename);            //开发测试使用，项目根目录下
+//        res = testRunPy(getJarRootPath()+"\\doc\\"+filename);                       //windows  class目录下，jar包后再jar包外生成，推荐
         res.getBody().setMsg("生成文件路径为："+ docInfo.getPath() +filename);
         return res;
+    }
+
+    @ApiOperation(value = "解析json生成新文件并保存linux运行", notes = "综合测试")
+    @ApiImplicitParams({
+            @ApiImplicitParam(name = "json", value = "传递来的json字符串", required = true, dataType = "String",paramType = "query")
+    })
+    @RequestMapping(value = "runlinuxjson",method = RequestMethod.GET)
+    @ResponseBody
+    public ResponseEntity<JsonResult> testLinuxCombine(@RequestParam(value = "json")String json){
+
+        JSONObject jsonObject = JSONObject.parseObject(json);
+        String filename = jsonObject.getString("filename");
+        String[] paths = jsonObject.getString("paths").split(",");
+        String result = "";
+        for (String pa : paths){
+            result += readFileByLines(pa);
+        }
+        TextToFile(filename,result,"linux");
+        ResponseEntity<JsonResult> res = null;
+        try {
+            res = testShell(getJarRootPath()+"/doc/"+filename);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return res;
+    }
+
+    private static String getJarRootPath() throws FileNotFoundException {
+        String path = ResourceUtils.getURL("classpath:").getPath();
+        //=> file:/root/tmp/demo-springboot-0.0.1-SNAPSHOT.jar!/BOOT-INF/classes!/
+        System.out.println("ResourceUtils.getURL(\"classpath:\").getPath() -> "+path);
+        //创建File时会自动处理前缀和jar包路径问题  => /root/tmp
+        File rootFile = new File(path);
+        if(!rootFile.exists()) {
+            System.out.println("根目录不存在, 重新创建");
+            rootFile = new File("");
+            System.out.println("重新创建的根目录: "+rootFile.getAbsolutePath());
+        }
+        System.out.println("项目根目录: "+rootFile.getAbsolutePath());        //获取的字符串末尾没有分隔符 /
+        return rootFile.getAbsolutePath();
     }
 }
