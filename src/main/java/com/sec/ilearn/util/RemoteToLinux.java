@@ -167,6 +167,9 @@ public class RemoteToLinux {
             String line = null;
             while ((line = br.readLine()) != null) {
                 buffer.append(line + "\n");
+                if(line.equals("None")){
+                    break;
+                }
             }
         } catch (UnsupportedEncodingException e) {
             e.printStackTrace();

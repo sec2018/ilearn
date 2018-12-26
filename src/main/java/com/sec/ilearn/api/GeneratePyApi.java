@@ -385,8 +385,8 @@ public class GeneratePyApi {
     public ResponseEntity<JsonResult> remoteRunLinux(){
         JsonResult r = new JsonResult();
         try {
-            String commandStr="cd /home/wangzhenjiang/eclipse-workspace; mv aa.py doc/aa.py";
-            String result = new RemoteToLinux().connectLinux("10.84.1.254","wangzhenjiang","123456",commandStr);
+            String commandStr="cd /home/xiejun/pythonexecscript; spark-submit test_result.py";
+            String result = new RemoteToLinux().connectLinux("10.84.3.20","root","ABCabc123",commandStr);
             System.out.println(result);
             if(result!=""){
                 r.setCode("200");
