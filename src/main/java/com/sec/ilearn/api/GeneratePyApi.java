@@ -1,8 +1,13 @@
 package com.sec.ilearn.api;
 
 import com.alibaba.fastjson.JSONObject;
+import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelSftp;
+import com.jcraft.jsch.Session;
 import com.sec.ilearn.pojo.DocInfo;
+import com.sec.ilearn.util.FTP;
 import com.sec.ilearn.util.JsonResult;
+import com.sec.ilearn.util.RemoteToLinux;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
 import io.swagger.annotations.ApiOperation;
@@ -21,11 +26,17 @@ import java.io.*;
 import java.util.Date;
 
 
+
 @RequestMapping("api")
 @Controller
 public class GeneratePyApi {
 
     private static final Logger logger = LogManager.getLogger(GeneratePyApi.class);
+
+    private static final String SFTP_HOST_NAME = "10.84.1.254";
+    private static final String SFTP_USERNAME = "wangzhenjiang";
+    private static final String SFTP_PASSWORD = "123456";
+    private static final int SFTP_PORT = 22;
 
     @Autowired
     private DocInfo docInfo;
@@ -113,10 +124,8 @@ public class GeneratePyApi {
 
         }else{
             logger.error("名称："+name+"\n运行："+pathName+":"+error,"system","系统异常");
-//            System.out.println("名称："+name+"\n运行："+pathName+":"+error+" system:系统异常");
             return "名称："+name+"\n运行："+pathName+":"+error+" system:系统异常";
         }
-//        System.out.println(pathName + " " +result);
         logger.info(new Date().toLocaleString()+"运行py文件成功  "+pathName + " " +result);
         return pathName + " 运行结果： " +result;
     }
@@ -327,4 +336,80 @@ public class GeneratePyApi {
         System.out.println("项目根目录: "+rootFile.getAbsolutePath());        //获取的字符串末尾没有分隔符 /
         return rootFile.getAbsolutePath();
     }
+
+    @ApiOperation(value = "上传文件到linux服务器并运行", notes = "上传文件到linux服务器并运行")
+    @ApiImplicitParams({
+            @ApiImplicitParam(name = "path", value = "要上传的文件路径", required = true, dataType = "String",paramType = "query")
+    })
+    @RequestMapping(value = "uploadtolinux",method = RequestMethod.GET)
+    @ResponseBody
+    public ResponseEntity<JsonResult> uploadToLinux(@RequestParam(value = "path")String path){
+        JsonResult r = new JsonResult();
+        String filename = path.trim().substring(path.trim().lastIndexOf("\\")+1);
+        String linuxpathdir = "/home/wangzhenjiang/eclipse-workspace/doc/";
+        try {
+
+            //提交到远程服务器
+            FTP ftp = new FTP();
+            Session session = ftp.getSession(SFTP_HOST_NAME,SFTP_PORT,SFTP_USERNAME,SFTP_PASSWORD);
+            Channel channel = ftp.getChannel(session);
+            ChannelSftp sftp = (ChannelSftp)channel;
+            ftp.uploadFile(sftp,linuxpathdir,new File(path));
+            ftp.closeAll(sftp,channel,session);
+
+            String commandStr="cd /home/wangzhenjiang/eclipse-workspace/doc; python "+filename;
+            String result = new RemoteToLinux().connectLinux(SFTP_HOST_NAME,SFTP_USERNAME,SFTP_PASSWORD,commandStr);
+            System.out.println(result);
+            r.setCode("200");
+            r.setMsg("上传文件到linux成功！");
+            r.setData(result);
+            r.setSuccess(true);
+            logger.info(new Date().toLocaleString()+"上传文件到linux成功！");
+        } catch (Exception e) {
+            e.printStackTrace();
+            r.setCode("500");
+            r.setMsg("上传文件到linux失败！");
+            r.setData(null);
+            r.setSuccess(false);
+            e.printStackTrace();
+        }
+        return ResponseEntity.ok(r);
+    }
+
+
+
+    //远程连接远程服务器并执行脚本命令
+    @ApiOperation(value = "远程连接远程服务器并执行脚本命令", notes = "远程连接远程服务器并执行脚本命令")
+    @RequestMapping(value = "remoterunlinux",method = RequestMethod.GET)
+    @ResponseBody
+    public ResponseEntity<JsonResult> remoteRunLinux(){
+        JsonResult r = new JsonResult();
+        try {
+            String commandStr="cd /home/wangzhenjiang/eclipse-workspace; mv aa.py doc/aa.py";
+            String result = new RemoteToLinux().connectLinux("10.84.1.254","wangzhenjiang","123456",commandStr);
+            System.out.println(result);
+            if(result!=""){
+                r.setCode("200");
+                r.setMsg("连接远程服务器并执行脚本命令成功！");
+                r.setData(result);
+                r.setSuccess(true);
+                logger.info(new Date().toLocaleString()+"连接远程服务器并执行脚本命令成功！");
+            }else {
+                r.setCode("500");
+                r.setMsg("连接远程服务器并执行脚本命令失败！");
+                r.setData(result);
+                r.setSuccess(false);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            r.setCode("500");
+            r.setMsg("连接远程服务器并执行脚本命令失败！");
+            r.setData(null);
+            r.setSuccess(false);
+            e.printStackTrace();
+        }
+        return ResponseEntity.ok(r);
+    }
+
+
 }
